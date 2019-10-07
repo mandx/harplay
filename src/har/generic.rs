@@ -51,7 +51,9 @@ pub struct Entries {
     pub cache: Cache,
     pub timings: Timings,
     #[serde(rename = "serverIPAddress")]
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub server_ip_address: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub connection: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub comment: Option<String>,
@@ -76,6 +78,9 @@ pub struct Request {
     pub body_size: i64,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub comment: Option<String>,
+    #[serde(rename = "headersCompression")]
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub headers_compression: Option<f64>,
 }
 
 #[derive(Clone, Debug, Deserialize, Serialize, PartialEq, Default)]
@@ -112,10 +117,15 @@ pub struct QueryString {
 pub struct PostData {
     #[serde(rename = "mimeType")]
     pub mime_type: String,
-    pub text: String,
+    /// Either text or params but not both : TODO turn into an untagged enum
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub text: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub params: Option<Vec<Params>>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub comment: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub encoding: Option<String>,
 }
 
 #[derive(Clone, Debug, Deserialize, Serialize, PartialEq, Default)]
@@ -123,16 +133,21 @@ pub struct Params {
     pub name: String,
     pub value: Option<String>,
     #[serde(rename = "fileName")]
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub file_name: Option<String>,
     #[serde(rename = "contentType")]
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub content_type: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub comment: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub encoding: Option<String>,
 }
 
 #[derive(Clone, Debug, Deserialize, Serialize, PartialEq, Default)]
 pub struct Response {
     #[serde(rename = "_charlesStatus")]
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub charles_status: Option<String>,
     pub status: i64,
     #[serde(rename = "statusText")]
@@ -150,16 +165,21 @@ pub struct Response {
     pub body_size: i64,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub comment: Option<String>,
+    #[serde(rename = "headersCompression")]
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub headers_compression: Option<f64>,
 }
 
 #[derive(Clone, Debug, Deserialize, Serialize, PartialEq, Default)]
 pub struct Content {
-    pub size: Option<i64>,
+    pub size: Option<f64>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub compression: Option<i64>,
     #[serde(rename = "mimeType")]
     pub mime_type: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub text: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub encoding: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub comment: Option<String>,
@@ -168,8 +188,10 @@ pub struct Content {
 #[derive(Clone, Debug, Deserialize, Serialize, PartialEq, Default)]
 pub struct Cache {
     #[serde(rename = "beforeRequest")]
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub before_request: Option<CacheEntity>,
     #[serde(rename = "afterRequest")]
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub after_request: Option<CacheEntity>,
 }
 
@@ -190,11 +212,14 @@ pub struct CacheEntity {
 pub struct Timings {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub blocked: Option<f64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub dns: Option<i64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub connect: Option<f64>,
     pub send: Option<f64>,
     pub wait: Option<f64>,
     pub receive: Option<f64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub ssl: Option<i64>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub comment: Option<String>,

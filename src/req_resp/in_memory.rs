@@ -20,9 +20,9 @@ pub struct InMemoryResponder {
 }
 
 impl InMemoryResponder {
-    fn new<RQ: Into<Request>, RP: Into<Response>>(
-        iter: impl Iterator<Item = (RQ, RP)>,
+    pub fn new<RQ: Into<Request>, RP: Into<Response>>(
         behaviour: ResponderBehaviour,
+        iter: impl Iterator<Item = (RQ, RP)>,
     ) -> Self {
         let mut responses: HashMap<Request, StatefulResponses> = HashMap::new();
 

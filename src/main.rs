@@ -4,17 +4,15 @@ mod har;
 mod logging;
 mod req_resp;
 
-use std::collections::HashMap;
 use std::convert::TryInto;
-use std::sync::{Arc, RwLock};
+use std::sync::{Arc, Mutex};
 
 use http::Request as HttpRequest;
 use warp::{Filter, Rejection, Reply};
 
 use crate::cli_args::CliArgs;
 use crate::errors::*;
-use crate::har::Spec;
-use crate::req_resp::{HarResponder, Request, Response};
+use crate::req_resp::{HarResponder, InMemoryResponder, Request, ResponderBehaviour, Response};
 
 fn extract_request(
 ) -> impl Filter<Extract = (http::Request<warp::body::BodyStream>,), Error = warp::Rejection> + Copy
@@ -39,38 +37,18 @@ fn extract_request(
         )
 }
 
-fn replay<T>(
+fn respond<T>(
     http_request: HttpRequest<T>,
-    request_map: Arc<RwLock<HashMap<Request, Vec<Response>>>>,
+    responder: Arc<Mutex<impl HarResponder>>,
 ) -> Result<impl Reply, Rejection> {
     let request: Request = http_request.try_into().context(IncomingUrl)?;
-    let read_lock = request_map.read().map_err(|_| AppError::DatabaseLock)?;
-    let responses = read_lock.get(&request).ok_or(AppError::RequestLookup)?;
 
-    responses
-        .get(0)
-        .ok_or(AppError::ResponseLookup)
-        .map_err(Rejection::from)
-        .map(Clone::clone)
-}
-
-fn respond<T, R>(
-    http_request: HttpRequest<T>,
-    responder: Arc<RwLock<impl HarResponder>>,
-) -> Result<impl Reply, Rejection> {
-    let request: Request = http_request.try_into().context(IncomingUrl)?;
-    let mut write_lock = responder.write().map_err(|_| AppError::DatabaseLock)?;
-
-    write_lock.respond_to(&request).map_err(|responder_error| {
-        Rejection::from(AppError::from(responder_error))
-    })
-
-    // let read_lock = responder.read().map_err(|_| AppError::DatabaseLock)?;
-    // let response = read_lock.respond_to(&request).map_err(From::from)?;
-    // response
-    //     .ok_or(AppError::ResponseLookup)
-    //     .map_err(Rejection::from)
-    //     .map(Clone::clone)
+    responder
+        // .write()
+        .lock()
+        .map_err(|_| AppError::DatabaseLock)?
+        .respond_to(&request)
+        .map_err(|responder_error| Rejection::from(AppError::from(responder_error)))
 }
 
 #[paw::main]
@@ -81,60 +59,54 @@ fn main(args: CliArgs) -> Result<(), Box<dyn std::error::Error>> {
     log::trace!("Loading requests from {:?}", args.har_file);
     log::trace!("URL filtering by {:?}", &args.url_filter);
 
-    let requests = Arc::new(RwLock::new({
-        let har_file = har::from_path(args.har_file)?;
-        let mut requests: HashMap<Request, Vec<Response>> =
-            HashMap::with_capacity(match &har_file.log {
-                Spec::V1_2(log) => log.entries.len(),
-                Spec::V1_3(log) => log.entries.len(),
-            });
+    let responder = Arc::new(Mutex::new({
+        let har_file = har::from_path(&args.har_file)?;
 
-        match har_file.log {
-            Spec::V1_2(log) => {
-                for entry in log.entries {
-                    if let Some(regex) = &args.url_filter {
-                        if !regex.is_match(&entry.request.url) {
-                            log::trace!(
-                                "Request excluded by filter: {} {}",
-                                &entry.request.method,
-                                &entry.request.url,
-                            );
-                            continue;
-                        }
-                    }
+        InMemoryResponder::new(
+            ResponderBehaviour::SequentialWrapping,
+            har_file
+                .log
+                .entries
+                .into_iter()
+                .filter(|entry| {
+                    args.url_filter
+                        .as_ref()
+                        .map(|regex| {
+                            let is_match = !regex.is_match(&entry.request.url);
 
-                    // Keep a clone of the URL around in case the conversion
-                    // fails, so we are able to log the problem and the cause.
+                            if !is_match {
+                                log::trace!(
+                                    "Request excluded by filter: {} {}",
+                                    &entry.request.method,
+                                    &entry.request.url,
+                                );
+                            }
+
+                            is_match
+                        })
+                        .unwrap_or(true)
+                })
+                .filter_map(|entry| {
                     let url = entry.request.url.clone();
-
-                    match entry.request.try_into() {
-                        Ok(request) => {
-                            log::info!("Adding {}", request);
-                            let responses = requests
-                                .entry(request)
-                                .or_insert_with(|| Vec::with_capacity(1));
-                            responses.push(entry.response.into());
-                        }
+                    let req: Request = match entry.request.try_into() {
+                        Ok(req) => req,
                         Err(error) => {
                             log::error!("Entry dropped: Error parsing URL {}: {:?}", url, error);
+                            return None;
                         }
-                    }
-                }
-            }
-            _ => {
-                unimplemented!("V1_3 not yet supported");
-            }
-        }
-
-        requests
+                    };
+                    let resp: Response = entry.response.into();
+                    Some((req, resp))
+                }),
+        )
     }));
 
     warp::serve(
         extract_request()
-            .and(warp::any().map(move || requests.clone()))
-            .and_then(replay),
+            .and(warp::any().map(move || responder.clone()))
+            .and_then(respond),
     )
-    .run(args.bind);
+    .run(args.network_bind);
 
     Ok(())
 }
