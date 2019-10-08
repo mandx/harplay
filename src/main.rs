@@ -44,11 +44,22 @@ fn respond<T>(
     let request: Request = http_request.try_into().context(IncomingUrl)?;
 
     responder
-        // .write()
         .lock()
         .map_err(|_| AppError::DatabaseLock)?
         .respond_to(&request)
         .map_err(|responder_error| Rejection::from(AppError::from(responder_error)))
+}
+
+fn respond_to_error(rejection: Rejection) -> Result<impl Reply, Rejection> {
+    if let Some(error) = rejection.find_cause::<AppError>() {
+        let msg = error.to_string();
+        let code = http::status::StatusCode::UNPROCESSABLE_ENTITY;
+        Ok(warp::reply::with_status(msg, code))
+    } else {
+        // Could be a NOT_FOUND, or any other internal error... here we just
+        // let warp use its default rendering.
+        Err(rejection)
+    }
 }
 
 #[paw::main]
@@ -104,7 +115,8 @@ fn main(args: CliArgs) -> Result<(), Box<dyn std::error::Error>> {
     warp::serve(
         extract_request()
             .and(warp::any().map(move || responder.clone()))
-            .and_then(respond),
+            .and_then(respond)
+            .recover(respond_to_error),
     )
     .run(args.network_bind);
 
