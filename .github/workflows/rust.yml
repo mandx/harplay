@@ -23,7 +23,7 @@ jobs:
           command: check
 
   test:
-    name: Test Suite
+    name: Tests
     runs-on: ubuntu-latest
     strategy:
       matrix:
@@ -42,7 +42,7 @@ jobs:
           command: test
 
   fmt:
-    name: Rustfmt
+    name: Formatting
     runs-on: ubuntu-latest
     strategy:
       matrix:
@@ -59,6 +59,7 @@ jobs:
       - run: rustup component add rustfmt
       - uses: actions-rs/cargo@v1
         with:
+          continue-on-error: true
           command: fmt
           args: --all -- --check
 
