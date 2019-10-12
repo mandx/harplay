@@ -23,7 +23,7 @@ pub struct Pages {
     #[serde(rename = "startedDateTime")]
     pub started_date_time: String,
     pub id: String,
-    pub title: String,
+    pub title: Option<String>,
     #[serde(rename = "pageTimings")]
     pub page_timings: PageTimings,
     #[serde(skip_serializing_if = "Option::is_none")]
