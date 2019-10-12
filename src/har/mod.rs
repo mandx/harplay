@@ -2,7 +2,7 @@ pub mod errors;
 pub mod generic;
 
 use std::fs::File;
-use std::io::Read;
+use std::io::{BufReader, Read};
 use std::path::Path;
 
 use serde::{Deserialize, Serialize};
@@ -21,7 +21,7 @@ pub fn from_path<P>(path: P) -> Result<Har, HarError>
 where
     P: AsRef<Path>,
 {
-    from_reader(File::open(path).context(Opening)?)
+    from_reader(BufReader::new(File::open(path).context(Opening)?))
 }
 
 /// Deserialize a HAR from type which implements Read
