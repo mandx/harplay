@@ -60,9 +60,64 @@ impl HarResponder for InMemoryResponder {
 
 #[cfg(test)]
 mod tests {
+    use test_case::test_case;
+    use url::Url;
 
-    #[test]
-    fn it_works() {
-        assert_eq!(2 + 2, 4);
+    use crate::req_resp::{
+        HarResponder, InMemoryResponder, Request, ResponderBehaviour, ResponderError, Response,
+    };
+
+    fn reqs_resp_fixture() -> impl Iterator<Item = (Request, Response)> {
+        (0..5).map(|i| {
+            (
+                Request {
+                    method: "GET".into(),
+                    url: Url::parse("http://harplay/path/").unwrap(),
+                    original_url: "http://harplay/path/".into(),
+                    headers: Vec::new(),
+                },
+                Response {
+                    status_code: 200,
+                    headers: Vec::new(),
+                    body: Some(i.to_string()),
+                },
+            )
+        })
+    }
+
+    use crate::req_resp::ResponderBehaviour::*;
+    #[test_case(AlwaysFirst, Ok("0"))]
+    #[test_case(AlwaysLast, Ok("4"))]
+    #[test_case(Random, Ok(""))]
+    #[test_case(SequentialClamping, Ok("0"))]
+    #[test_case(SequentialOnce, Ok("0"))]
+    #[test_case(SequentialWrapping, Ok("0"))]
+    fn it_works(behaviour: ResponderBehaviour, content: Result<&'static str, ResponderError>) {
+        let req: Request = Request {
+            method: "GET".into(),
+            url: Url::parse("http://harplay/path/").unwrap(),
+            original_url: "http://harplay/path/".into(),
+            headers: Vec::new(),
+        };
+
+        let mut responder = InMemoryResponder::new(behaviour.clone(), reqs_resp_fixture());
+
+        if behaviour == Random {
+            assert!(responder.respond_to(&req).is_ok());
+        } else {
+            assert_eq!(
+                responder.respond_to(&req).unwrap().body,
+                content
+                    .map(|content| {
+                        Response {
+                            status_code: 200,
+                            headers: Vec::new(),
+                            body: Some(content.to_string()),
+                        }
+                    })
+                    .unwrap()
+                    .body
+            );
+        }
     }
 }

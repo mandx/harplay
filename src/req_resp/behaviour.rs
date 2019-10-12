@@ -1,6 +1,6 @@
 use std::str::FromStr;
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub enum ResponderBehaviour {
     AlwaysFirst,
     AlwaysLast,
@@ -148,9 +148,4 @@ mod tests {
     ) {
         assert_eq!(variant.choose_index(last, length), expected);
     }
-
-    // #[test]
-    // fn it_works() {
-    //     assert_eq!(2 + 2, 4);
-    // }
 }

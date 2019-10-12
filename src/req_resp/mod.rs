@@ -47,14 +47,6 @@ impl From<crate::har::Response> for Response {
     }
 }
 
-// impl TryFrom<crate::har::Response> for Response {
-//     type Error = Infallible;
-
-//     fn try_from(response: crate::har::Response) -> Result<Self, Self::Error> {
-//         Ok(response.into())
-//     }
-// }
-
 impl warp::reply::Reply for Response {
     fn into_response(self) -> warp::reply::Response {
         let mut resp_builder = http::Response::builder();
