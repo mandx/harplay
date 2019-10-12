@@ -68,7 +68,12 @@ fn main(args: CliArgs) -> Result<(), Box<dyn std::error::Error>> {
 
     log::trace!("{} {}", "harPlay", env!("CARGO_PKG_VERSION"));
     log::trace!("Loading requests from {:?}", args.har_file);
-    log::trace!("URL filtering by {:?}", &args.url_filter);
+
+    if let Some(regex) = &args.url_filter {
+        log::trace!("URL filtering by {:?}", regex);
+    } else {
+        log::trace!("URL filtering disabled");
+    }
 
     let responder = Arc::new(Mutex::new({
         let har_file = har::from_path(&args.har_file)?;
@@ -100,7 +105,10 @@ fn main(args: CliArgs) -> Result<(), Box<dyn std::error::Error>> {
                 .filter_map(|entry| {
                     let url = entry.request.url.clone();
                     let req: Request = match entry.request.try_into() {
-                        Ok(req) => req,
+                        Ok(req) => {
+                            log::trace!("Adding {}", req);
+                            req
+                        }
                         Err(error) => {
                             log::error!("Entry dropped: Error parsing URL {}: {:?}", url, error);
                             return None;
