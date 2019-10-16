@@ -27,15 +27,15 @@ impl InMemoryResponder {
         let mut responses: HashMap<Request, StatefulResponses> = HashMap::new();
 
         for (into_req, into_resp) in iter {
-            let req = into_req.into();
-            let resp = into_resp.into();
-
-            let stateful_responses = responses.entry(req).or_insert_with(|| StatefulResponses {
-                responses: Vec::with_capacity(1),
-                behaviour: behaviour.clone(),
-                last_index: None,
-            });
-            stateful_responses.responses.push(resp.into());
+            let stateful_responses =
+                responses
+                    .entry(into_req.into())
+                    .or_insert_with(|| StatefulResponses {
+                        responses: Vec::with_capacity(1),
+                        behaviour: behaviour.clone(),
+                        last_index: None,
+                    });
+            stateful_responses.responses.push(into_resp.into());
         }
 
         Self { responses }

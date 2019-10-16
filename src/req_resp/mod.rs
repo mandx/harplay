@@ -3,8 +3,6 @@ mod errors;
 mod in_memory;
 
 use std::convert::TryFrom;
-use std::fmt::Debug;
-
 use url::Url;
 
 pub use behaviour::ResponderBehaviour;
