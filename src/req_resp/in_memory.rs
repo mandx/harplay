@@ -79,7 +79,7 @@ mod tests {
                 Response {
                     status_code: 200,
                     headers: Vec::new(),
-                    body: Some(i.to_string()),
+                    body: Some(i.to_string().into()),
                 },
             )
         })
@@ -112,7 +112,7 @@ mod tests {
                         Response {
                             status_code: 200,
                             headers: Vec::new(),
-                            body: Some(content.to_string()),
+                            body: Some(content.into()),
                         }
                     })
                     .unwrap()

@@ -10,7 +10,7 @@ pub use errors::*;
 pub use in_memory::InMemoryResponder;
 
 // Maybe rename these generic names into more specific ones,
-// since we are also dealing with `http`'s and `warp`'s types.
+// since we are also dealing with `http`'s types.
 
 #[derive(Debug, Clone)]
 pub struct Header {
@@ -32,37 +32,16 @@ impl From<crate::har::Headers> for Header {
 pub struct Response {
     pub status_code: u16,
     pub headers: Vec<Header>,
-    pub body: Option<String>,
+    pub body: Option<Vec<u8>>,
 }
 
 impl From<crate::har::Response> for Response {
     fn from(response: crate::har::Response) -> Self {
         Self {
             status_code: response.status as u16,
-            body: response.content.text,
+            body: response.content.text.map(Into::into),
             headers: response.headers.iter().cloned().map(From::from).collect(),
         }
-    }
-}
-
-impl warp::reply::Reply for Response {
-    fn into_response(self) -> warp::reply::Response {
-        let mut resp_builder = http::Response::builder();
-        resp_builder.status(self.status_code);
-        for header in self.headers {
-            if header.name == "content-length" {
-                continue;
-            }
-
-            if header.name == "transfer-encoding" {
-                continue;
-            }
-
-            resp_builder.header(&header.name, &header.value);
-        }
-        resp_builder
-            .body(self.body.unwrap_or_else(String::new).into())
-            .unwrap()
     }
 }
 
@@ -201,4 +180,22 @@ impl TryFrom<crate::har::Request> for Request {
 
 pub trait HarResponder {
     fn respond_to(&mut self, request: &Request) -> Result<Response, ResponderError>;
+}
+
+impl From<Response> for http::Response<hyper::Body> {
+    fn from(response: Response) -> Self {
+        let mut resp_builder = http::Response::builder();
+        for header in response.headers.iter() {
+            resp_builder.header(&header.name, &header.value);
+        }
+        resp_builder
+            .status(http::StatusCode::from_u16(response.status_code).unwrap())
+            .body(
+                response
+                    .body
+                    .map(hyper::Body::from)
+                    .unwrap_or_else(hyper::Body::empty),
+            )
+            .unwrap()
+    }
 }
