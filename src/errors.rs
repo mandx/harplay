@@ -15,17 +15,22 @@ pub enum AppError {
     ResponseLookup,
 }
 
-impl From<AppError> for warp::reject::Rejection {
-    fn from(error: AppError) -> Self {
-        warp::reject::custom(error)
-    }
-}
-
 impl From<ResponderError> for AppError {
     fn from(error: ResponderError) -> Self {
         match error {
             ResponderError::RequestNotFound => Self::RequestLookup,
             ResponderError::ResponseNotFound => Self::ResponseLookup,
         }
+    }
+}
+
+use hyper::{Body as HttpBody, Response as HttpResponse};
+
+impl From<AppError> for HttpResponse<HttpBody> {
+    fn from(_error: AppError) -> Self {
+        HttpResponse::builder()
+            .status(418)
+            .body(HttpBody::empty())
+            .unwrap()
     }
 }

@@ -10,6 +10,7 @@ edition = "2018"
 chrono = "^0.4"
 fern = { version = "^0.5", features = ["colored"] }
 http = "*"
+hyper = "^0.13.0-alpha.4"
 log = "^0.4"
 paw = "^1"
 rand = "^0.7"
@@ -18,8 +19,8 @@ serde = { version = "^1.0", features = ["derive"] }
 serde_json = "^1"
 snafu = { version = "^0.5" }
 structopt = { version = "^0.3", features = [ "paw" ] }
+tokio = "^0.2.0-alpha.6"
 url = "^2"
-warp = "^0.1"
 
 [dev-dependencies]
 test-case = "0.3.3"

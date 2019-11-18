@@ -7,59 +7,35 @@ mod req_resp;
 use std::convert::TryInto;
 use std::sync::{Arc, Mutex};
 
-use http::Request as HttpRequest;
-use warp::{Filter, Rejection, Reply};
+use hyper::{
+    service::{make_service_fn, service_fn},
+    Body as HttpBody, Error as HttpError, Request as HttpRequest, Response as HttpResponse, Server,
+};
+use tokio::runtime::__main::Runtime;
 
 use crate::cli_args::CliArgs;
 use crate::errors::*;
 use crate::req_resp::{HarResponder, InMemoryResponder, Request, ResponderBehaviour, Response};
 
-fn extract_request(
-) -> impl Filter<Extract = (http::Request<warp::body::BodyStream>,), Error = warp::Rejection> + Copy
-{
-    warp::method()
-        .and(warp::path::full())
-        .and(warp::filters::header::headers_cloned())
-        .and(warp::body::stream())
-        .map(
-            |method: http::Method,
-             path: warp::path::FullPath,
-             headers: http::HeaderMap,
-             body: warp::body::BodyStream| {
-                let mut req = http::Request::builder()
-                    .method(method)
-                    .uri(path.as_str())
-                    .body(body)
-                    .expect("request builder");
-                *req.headers_mut() = headers;
-                req
-            },
-        )
-}
-
-fn respond<T>(
+async fn respond<T>(
     http_request: HttpRequest<T>,
     responder: Arc<Mutex<impl HarResponder>>,
-) -> Result<impl Reply, Rejection> {
-    let request: Request = http_request.try_into().context(IncomingUrl)?;
+) -> Result<HttpResponse<HttpBody>, HttpError> {
+    let request: Request = match http_request.try_into().context(IncomingUrl) {
+        Ok(request) => request,
+        Err(error) => return Ok(error.into()),
+    };
 
-    responder
-        .lock()
-        .map_err(|_| AppError::DatabaseLock)?
+    let mut responder = match responder.lock() {
+        Ok(lock) => lock,
+        Err(_) => return Ok(AppError::DatabaseLock.into()),
+    };
+
+    Ok(responder
         .respond_to(&request)
-        .map_err(|responder_error| Rejection::from(AppError::from(responder_error)))
-}
-
-fn respond_to_error(rejection: Rejection) -> Result<impl Reply, Rejection> {
-    if let Some(error) = rejection.find_cause::<AppError>() {
-        let msg = error.to_string();
-        let code = http::status::StatusCode::UNPROCESSABLE_ENTITY;
-        Ok(warp::reply::with_status(msg, code))
-    } else {
-        // Could be a NOT_FOUND, or any other internal error... here we just
-        // let warp use its default rendering.
-        Err(rejection)
-    }
+        .map(HttpResponse::<HttpBody>::from)
+        .map_err(AppError::from)
+        .unwrap_or_else(HttpResponse::<HttpBody>::from))
 }
 
 #[paw::main]
@@ -120,13 +96,19 @@ fn main(args: CliArgs) -> Result<(), Box<dyn std::error::Error>> {
         )
     }));
 
-    warp::serve(
-        extract_request()
-            .and(warp::any().map(move || responder.clone()))
-            .and_then(respond)
-            .recover(respond_to_error),
-    )
-    .run(args.network_bind);
+    let service = make_service_fn(move |_| {
+        let responder = responder.clone();
+
+        async {
+            Ok::<_, HttpError>(service_fn(move |request| {
+                respond(request, responder.clone())
+            }))
+        }
+    });
+
+    let server = Server::bind(&args.network_bind).serve(service);
+
+    Runtime::new()?.block_on(server)?;
 
     Ok(())
 }
