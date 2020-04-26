@@ -11,7 +11,7 @@ use hyper::{
     service::{make_service_fn, service_fn},
     Body as HttpBody, Error as HttpError, Request as HttpRequest, Response as HttpResponse, Server,
 };
-use tokio::runtime::__main::Runtime;
+use tokio::runtime::Runtime;
 
 use crate::cli_args::CliArgs;
 use crate::errors::*;

@@ -84,21 +84,20 @@ impl<B> TryFrom<http::Request<B>> for Request {
 
     fn try_from(req: http::Request<B>) -> Result<Self, Self::Error> {
         use http::uri::{Authority, Builder as UriBuilder, PathAndQuery};
-        use http::HttpTryFrom;
         let original_uri = req.uri();
 
         let mut url = UriBuilder::new()
             .authority(
                 original_uri
-                    .authority_part()
+                    .authority()
                     .map(Clone::clone)
                     .unwrap_or_else(|| Authority::from_static("harplay")),
             )
             .scheme(
                 original_uri
-                    .scheme_part()
+                    .scheme()
                     .map(Clone::clone)
-                    .unwrap_or_else(|| HttpTryFrom::try_from("http").unwrap()),
+                    .unwrap_or_else(|| TryFrom::try_from("http").unwrap()),
             )
             .path_and_query(
                 original_uri
@@ -184,10 +183,25 @@ pub trait HarResponder {
 
 impl From<Response> for http::Response<hyper::Body> {
     fn from(response: Response) -> Self {
+        use http::header::{HeaderName, HeaderValue};
         let mut resp_builder = http::Response::builder();
-        for header in response.headers.iter() {
-            resp_builder.header(&header.name, &header.value);
+
+        if let Some(resp_headers) = resp_builder.headers_mut() {
+            for header in response.headers.iter() {
+                match (
+                    header.name.parse::<HeaderName>(),
+                    header.value.parse::<HeaderValue>(),
+                ) {
+                    (Ok(header_name), Ok(header_value)) => {
+                        resp_headers.append(header_name, header_value);
+                    }
+                    _ => {
+                        // TODO: Log header parsing failures?
+                    }
+                }
+            }
         }
+
         resp_builder
             .status(http::StatusCode::from_u16(response.status_code).unwrap())
             .body(
