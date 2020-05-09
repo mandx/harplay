@@ -188,17 +188,13 @@ impl From<Response> for http::Response<hyper::Body> {
 
         if let Some(resp_headers) = resp_builder.headers_mut() {
             for header in response.headers.iter() {
-                match (
+                if let (Ok(header_name), Ok(header_value)) = (
                     header.name.parse::<HeaderName>(),
                     header.value.parse::<HeaderValue>(),
                 ) {
-                    (Ok(header_name), Ok(header_value)) => {
-                        resp_headers.append(header_name, header_value);
-                    }
-                    _ => {
-                        // TODO: Log header parsing failures?
-                    }
+                    resp_headers.append(header_name, header_value);
                 }
+                // TODO: Log header parsing failures?
             }
         }
 

@@ -34,3 +34,46 @@ impl From<AppError> for HttpResponse<HttpBody> {
             .unwrap()
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use assert_matches::assert_matches;
+
+    #[test]
+    fn test_responder_app_error_conversions() {
+        assert_matches!(
+            AppError::from(ResponderError::RequestNotFound),
+            AppError::RequestLookup
+        );
+        assert_matches!(
+            AppError::from(ResponderError::ResponseNotFound),
+            AppError::ResponseLookup
+        );
+    }
+
+    #[test]
+    fn test_response_app_error_conversions() {
+        let responses = &[
+            HttpResponse::from(AppError::IncomingUrl {
+                source: IntoRequestError::NonHttpScheme,
+            }),
+            HttpResponse::from(AppError::IncomingUrl {
+                source: IntoRequestError::ParsingUrl,
+            }),
+            HttpResponse::from(AppError::IncomingUrl {
+                source: IntoRequestError::ReplacingHost,
+            }),
+            HttpResponse::from(AppError::IncomingUrl {
+                source: IntoRequestError::ReplacingScheme,
+            }),
+            HttpResponse::from(AppError::DatabaseLock),
+            HttpResponse::from(AppError::RequestLookup),
+            HttpResponse::from(AppError::ResponseLookup),
+        ];
+
+        for resp in responses {
+            assert_eq!(resp.status().as_u16(), 418);
+        }
+    }
+}

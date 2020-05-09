@@ -21,7 +21,7 @@ async fn respond<T>(
     http_request: HttpRequest<T>,
     responder: Arc<Mutex<impl HarResponder>>,
 ) -> Result<HttpResponse<HttpBody>, HttpError> {
-    let request: Request = match http_request.try_into().context(IncomingUrl) {
+    let request = match http_request.try_into().context(IncomingUrl) {
         Ok(request) => request,
         Err(error) => return Ok(error.into()),
     };

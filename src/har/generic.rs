@@ -2,6 +2,7 @@ use serde::{Deserialize, Serialize};
 
 #[derive(Clone, Debug, Deserialize, Serialize, PartialEq, Default)]
 pub struct Log {
+    pub version: Option<String>,
     pub creator: Creator,
     pub browser: Option<Creator>,
     pub pages: Option<Vec<Pages>>,
