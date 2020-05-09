@@ -106,9 +106,9 @@ fn main(args: CliArgs) -> Result<(), Box<dyn std::error::Error>> {
         }
     });
 
-    let server = Server::bind(&args.network_bind).serve(service);
-
-    Runtime::new()?.block_on(server)?;
+    Runtime::new()?.block_on(async {
+        Server::bind(&args.network_bind).serve(service).await
+    })?;
 
     Ok(())
 }
